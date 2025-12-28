@@ -51,7 +51,6 @@ export const GameContainer: React.FC<Props> = ({ gameState, setGameState, onWin,
 
       // Collisions
       for (const p of platforms) {
-        // Simple AABB
         if (
           newPosX < p.pos.x + p.size.x &&
           newPosX + player.size.x > p.pos.x &&
@@ -60,14 +59,13 @@ export const GameContainer: React.FC<Props> = ({ gameState, setGameState, onWin,
         ) {
           if (p.type === 'goal') {
             onWin();
-            return prev; // Let the onWin handle the transition
+            return prev;
           }
           if (p.type === 'hazard') {
             onGameOver();
             return prev;
           }
 
-          // Platform resolution (simplistic)
           if (player.pos.y + player.size.y <= p.pos.y) {
             newPosY = p.pos.y - player.size.y;
             newVelY = 0;
@@ -82,11 +80,9 @@ export const GameContainer: React.FC<Props> = ({ gameState, setGameState, onWin,
         }
       }
 
-      // Screen boundaries
       if (newPosX < 0) newPosX = 0;
       if (newPosX > 800 - player.size.x) newPosX = 800 - player.size.x;
       
-      // Fall off
       if (newPosY > 600) {
         onGameOver();
         return prev;
@@ -109,17 +105,11 @@ export const GameContainer: React.FC<Props> = ({ gameState, setGameState, onWin,
   }, [gameState.status, onWin, onGameOver, setGameState]);
 
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      keys.current[e.code] = true;
-    };
-    const handleKeyUp = (e: KeyboardEvent) => {
-      keys.current[e.code] = false;
-    };
+    const handleKeyDown = (e: KeyboardEvent) => { keys.current[e.code] = true; };
+    const handleKeyUp = (e: KeyboardEvent) => { keys.current[e.code] = false; };
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
-    
     requestRef.current = requestAnimationFrame(update);
-    
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
@@ -127,7 +117,6 @@ export const GameContainer: React.FC<Props> = ({ gameState, setGameState, onWin,
     };
   }, [update]);
 
-  // Renderer
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -137,54 +126,55 @@ export const GameContainer: React.FC<Props> = ({ gameState, setGameState, onWin,
     const render = () => {
       ctx.clearRect(0, 0, 800, 600);
 
-      // Draw Background Details
+      // Grid background
       ctx.strokeStyle = '#18181b';
       ctx.lineWidth = 1;
-      for(let i=0; i<800; i+=40) {
-        ctx.beginPath();
-        ctx.moveTo(i, 0); ctx.lineTo(i, 600);
-        ctx.stroke();
-      }
-      for(let i=0; i<600; i+=40) {
-        ctx.beginPath();
-        ctx.moveTo(0, i); ctx.lineTo(800, i);
-        ctx.stroke();
-      }
+      for(let i=0; i<800; i+=40) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 600); ctx.stroke(); }
+      for(let i=0; i<600; i+=40) { ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(800, i); ctx.stroke(); }
 
-      // Draw Platforms
+      // Platforms
       gameState.platforms.forEach(p => {
-        if (p.type === 'goal') {
-          ctx.fillStyle = '#4ade80';
-          ctx.shadowBlur = 15;
-          ctx.shadowColor = '#4ade80';
-        } else if (p.type === 'hazard') {
-          ctx.fillStyle = '#ef4444';
-          ctx.shadowBlur = 10;
-          ctx.shadowColor = '#ef4444';
-        } else {
-          ctx.fillStyle = '#3f3f46';
-          ctx.shadowBlur = 0;
-        }
+        if (p.type === 'goal') { ctx.fillStyle = '#4ade80'; ctx.shadowBlur = 15; ctx.shadowColor = '#4ade80'; }
+        else if (p.type === 'hazard') { ctx.fillStyle = '#ef4444'; ctx.shadowBlur = 10; ctx.shadowColor = '#ef4444'; }
+        else { ctx.fillStyle = '#3f3f46'; ctx.shadowBlur = 0; }
         ctx.fillRect(p.pos.x, p.pos.y, p.size.x, p.size.y);
         ctx.shadowBlur = 0;
-        
-        // Highlights
         ctx.fillStyle = 'rgba(255,255,255,0.05)';
         ctx.fillRect(p.pos.x, p.pos.y, p.size.x, 2);
       });
 
-      // Draw Stickman
-      const { pos, size, facing, animFrame, vel } = gameState.player;
-      ctx.strokeStyle = 'white';
+      // Stickman
+      const { pos, size, facing, animFrame, vel, customization } = gameState.player;
+      const centerX = pos.x + size.x / 2;
+      const headY = pos.y + 10;
+      
+      ctx.strokeStyle = customization.color;
       ctx.lineWidth = 3;
       ctx.lineCap = 'round';
+      ctx.shadowBlur = 5;
+      ctx.shadowColor = customization.color;
 
-      const centerX = pos.x + size.x / 2;
-      const centerY = pos.y + size.y / 2;
-      
+      const walkCycle = Math.sin(animFrame);
+      const legAngle = Math.abs(vel.x) > 0.5 ? walkCycle * 0.5 : 0;
+      const armAngle = Math.abs(vel.x) > 0.5 ? -walkCycle * 0.4 : 0;
+
+      // Accessory: Cape (Rendered behind)
+      if (customization.accessory === 'cape') {
+        ctx.fillStyle = customization.color;
+        ctx.globalAlpha = 0.5;
+        ctx.beginPath();
+        const capeFlow = Math.abs(vel.x) * 5;
+        ctx.moveTo(centerX, pos.y + 20);
+        const capeX = facing === 'right' ? centerX - 15 - capeFlow : centerX + 15 + capeFlow;
+        ctx.lineTo(capeX, pos.y + 45);
+        ctx.lineTo(centerX, pos.y + 40);
+        ctx.fill();
+        ctx.globalAlpha = 1.0;
+      }
+
       // Head
       ctx.beginPath();
-      ctx.arc(centerX, pos.y + 10, 8, 0, Math.PI * 2);
+      ctx.arc(centerX, headY, 8, 0, Math.PI * 2);
       ctx.stroke();
 
       // Body
@@ -193,49 +183,74 @@ export const GameContainer: React.FC<Props> = ({ gameState, setGameState, onWin,
       ctx.lineTo(centerX, pos.y + 35);
       ctx.stroke();
 
-      // Animation calculations
-      const walkCycle = Math.sin(animFrame);
-      const legAngle = Math.abs(vel.x) > 0.5 ? walkCycle * 0.5 : 0;
-      const armAngle = Math.abs(vel.x) > 0.5 ? -walkCycle * 0.4 : 0;
-
       // Legs
       ctx.beginPath();
       ctx.moveTo(centerX, pos.y + 35);
       ctx.lineTo(centerX - 10 - legAngle * 10, pos.y + 50);
       ctx.stroke();
-      
       ctx.beginPath();
       ctx.moveTo(centerX, pos.y + 35);
       ctx.lineTo(centerX + 10 + legAngle * 10, pos.y + 50);
       ctx.stroke();
 
       // Arms
-      const armOffset = facing === 'right' ? 5 : -5;
       ctx.beginPath();
       ctx.moveTo(centerX, pos.y + 22);
       ctx.lineTo(centerX - 15 - armAngle * 15, pos.y + 25 + (vel.y < 0 ? -15 : 0));
       ctx.stroke();
-      
       ctx.beginPath();
       ctx.moveTo(centerX, pos.y + 22);
       ctx.lineTo(centerX + 15 + armAngle * 15, pos.y + 25 + (vel.y < 0 ? -15 : 0));
       ctx.stroke();
 
       // Eyes
-      ctx.fillStyle = 'black';
+      ctx.fillStyle = customization.color === '#ffffff' ? 'black' : 'white';
       const eyeX = facing === 'right' ? centerX + 3 : centerX - 5;
       ctx.fillRect(eyeX, pos.y + 8, 2, 2);
+
+      // Helm
+      if (customization.helm !== 'none') {
+        ctx.fillStyle = '#71717a';
+        ctx.shadowBlur = 0;
+        if (customization.helm === 'knight') {
+          ctx.beginPath();
+          ctx.moveTo(centerX - 10, headY - 5);
+          ctx.lineTo(centerX + 10, headY - 5);
+          ctx.lineTo(centerX + 10, headY - 12);
+          ctx.lineTo(centerX - 10, headY - 12);
+          ctx.fill();
+        } else if (customization.helm === 'viking') {
+          ctx.beginPath();
+          ctx.moveTo(centerX - 8, headY - 5);
+          ctx.lineTo(centerX - 12, headY - 15);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(centerX + 8, headY - 5);
+          ctx.lineTo(centerX + 12, headY - 15);
+          ctx.stroke();
+        } else if (customization.helm === 'wizard') {
+          ctx.beginPath();
+          ctx.moveTo(centerX - 12, headY - 5);
+          ctx.lineTo(centerX, headY - 22);
+          ctx.lineTo(centerX + 12, headY - 5);
+          ctx.fill();
+        }
+      }
+
+      // Accessory: Scarf (Rendered on top)
+      if (customization.accessory === 'scarf') {
+        ctx.strokeStyle = '#ef4444';
+        ctx.beginPath();
+        ctx.moveTo(centerX - 5, pos.y + 18);
+        ctx.lineTo(centerX + 5, pos.y + 18);
+        ctx.lineWidth = 4;
+        ctx.stroke();
+        ctx.lineWidth = 3;
+      }
     };
 
     render();
   }, [gameState]);
 
-  return (
-    <canvas 
-      ref={canvasRef} 
-      width={800} 
-      height={600} 
-      className="w-full h-full block bg-zinc-900"
-    />
-  );
+  return <canvas ref={canvasRef} width={800} height={600} className="w-full h-full block bg-zinc-900" />;
 };

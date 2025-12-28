@@ -14,12 +14,19 @@ export interface Platform extends Entity {
   color?: string;
 }
 
+export interface PlayerCustomization {
+  color: string;
+  helm: 'none' | 'knight' | 'viking' | 'wizard';
+  accessory: 'none' | 'cape' | 'scarf';
+}
+
 export interface Player extends Entity {
   vel: Vector2D;
   isGrounded: boolean;
   isJumping: boolean;
   facing: 'left' | 'right';
   animFrame: number;
+  customization: PlayerCustomization;
 }
 
 export interface GameState {
