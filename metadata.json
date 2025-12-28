@@ -1,0 +1,5 @@
+{
+  "name": "StickHero: The Infinite Ascent",
+  "description": "An interactive platformer where you control a stickman to overcome obstacles and reach the goal. Features a dynamic physics engine and AI-powered level narration.",
+  "requestFramePermissions": []
+}
